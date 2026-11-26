@@ -1,4 +1,4 @@
-# PoliHalla — Taller 05
+# PoliHalla — Examen
 
 Aplicación de ejemplo para registrar objetos perdidos y encontrados en el campus. El proyecto usa Kotlin Multiplatform y Compose Multiplatform. Se creó a partir de la estructura de HolaMundoKMP.
 
