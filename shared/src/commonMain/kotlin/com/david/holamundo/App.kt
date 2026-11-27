@@ -1,11 +1,26 @@
 package com.david.holamundo
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.lightColorScheme
@@ -19,8 +34,8 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-
-private val Azul = Color(0xFF1556C5)
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 
 private val reportesSaver = listSaver<SnapshotStateList<Reporte>, String>(
     save = { reportes ->
@@ -102,29 +117,69 @@ fun App(
         coincideBusqueda && coincideFiltro
     }
 
-    MaterialTheme(colorScheme = lightColorScheme(primary = Azul, background = Color(0xFFF7F9FD), surface = Color.White)) {
+    MaterialTheme(colorScheme = lightColorScheme(
+        primary = AzulPrincipal,
+        secondary = AzulOscuro,
+        background = Fondo,
+        surface = Color.White,
+        surfaceVariant = AzulClaro,
+        onSurface = Tinta
+    )) {
         Scaffold(
             modifier = Modifier.fillMaxSize(),
-            containerColor = Color(0xFFF7F9FD),
+            containerColor = Fondo,
             bottomBar = {
-                if (pantalla in listOf("Inicio", "Reportes", "Mis reportes")) {
-                    NavigationBar(containerColor = Color.White) {
-                        listOf("Inicio" to "⌂", "Reportes" to "☰", "Mis reportes" to "●").forEach { (destino, simbolo) ->
+                AnimatedVisibility(
+                    visible = pantalla in listOf("Inicio", "Reportes", "Mis reportes"),
+                    enter = fadeIn(tween(180)) + slideInVertically(tween(220)) { it / 3 },
+                    exit = fadeOut(tween(120)) + slideOutVertically(tween(180)) { it / 3 }
+                ) {
+                    NavigationBar(containerColor = Color.White, tonalElevation = 3.dp) {
+                        listOf(
+                            "Inicio" to IconoPoli.INICIO,
+                            "Reportes" to IconoPoli.LISTA,
+                            "Mis reportes" to IconoPoli.USUARIO
+                        ).forEach { (destino, icono) ->
                             NavigationBarItem(
                                 selected = pantalla == destino,
                                 onClick = { pantalla = destino },
-                                icon = { Text(simbolo) },
-                                label = { Text(destino) }
+                                icon = { Icono(icono, Modifier.size(22.dp), if (pantalla == destino) AzulPrincipal else TextoSecundario) },
+                                label = { Text(destino) },
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedTextColor = AzulPrincipal,
+                                    unselectedTextColor = TextoSecundario,
+                                    indicatorColor = AzulClaro
+                                )
                             )
                         }
                     }
                 }
             }
         ) { padding ->
-            when (pantalla) {
+            AnimatedContent(
+                targetState = pantalla,
+                modifier = Modifier.fillMaxSize(),
+                transitionSpec = {
+                    fun orden(destino: String) = when (destino) {
+                        "Inicio" -> 0
+                        "Reportes" -> 1
+                        "Mis reportes" -> 2
+                        "Detalle" -> 3
+                        else -> 4
+                    }
+                    val direccion = if (orden(targetState) >= orden(initialState)) 1 else -1
+                    (fadeIn(tween(240)) + slideInHorizontally(tween(240)) { direccion * it / 18 }) togetherWith
+                        (fadeOut(tween(160)) + slideOutHorizontally(tween(200)) { -direccion * it / 22 })
+                },
+                label = "Cambio de pantalla"
+            ) { pantallaActual ->
+            when (pantallaActual) {
                 "Inicio" -> PantallaInicio(
                     padding = padding,
                     recientes = reportes.take(3),
+                    total = reportes.size,
+                    perdidos = reportes.count { it.tipo == TipoReporte.PERDIDO && !it.recuperado },
+                    encontrados = reportes.count { it.tipo == TipoReporte.ENCONTRADO && !it.recuperado },
                     alReportar = { abrirFormulario(null, it) },
                     alVerTodos = { pantalla = "Reportes" },
                     alEditar = { abrirFormulario(it) },
@@ -134,7 +189,7 @@ fun App(
                 )
                 "Reportes", "Mis reportes" -> PantallaReportes(
                     padding = padding,
-                    titulo = if (pantalla == "Reportes") "Reportes del campus" else "Mis reportes",
+                    titulo = if (pantallaActual == "Reportes") "Reportes del campus" else "Mis reportes",
                     reportes = listaVisible,
                     busqueda = busqueda,
                     alBuscar = { busqueda = it },
@@ -180,14 +235,22 @@ fun App(
                     imagen = imagen
                 )
             }
+            }
         }
 
         val seleccionado = reportes.firstOrNull { it.id == reporteAEliminar }
         if (seleccionado != null) {
             AlertDialog(
                 onDismissRequest = { reporteAEliminar = -1L },
-                title = { Text("¿Eliminar reporte?") },
-                text = { Text("Se eliminará el reporte de ${seleccionado.nombre}.") },
+                containerColor = Color.White,
+                shape = RoundedCornerShape(24.dp),
+                icon = {
+                    Surface(color = Color(0xFFFFEFEF), shape = RoundedCornerShape(16.dp)) {
+                        Icono(IconoPoli.ELIMINAR, Modifier.padding(12.dp).size(24.dp), Color(0xFFB45353))
+                    }
+                },
+                title = { Text("¿Eliminar reporte?", color = Tinta, fontWeight = FontWeight.ExtraBold) },
+                text = { Text("Se eliminará el reporte de ${seleccionado.nombre}.", color = TextoSecundario) },
                 confirmButton = {
                     TextButton(onClick = {
                         eliminarReporte(reportes, seleccionado.id)
